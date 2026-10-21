@@ -1,0 +1,13 @@
+services:
+  back-end:
+    build:
+      context: ./backend
+      args:
+        REGISTRY: ${REGISTRY}
+    image: ${REGISTRY}/back-end-booking:latest
+  front-end:
+    build:
+      context: ./frontend
+      args:
+        REGISTRY: ${REGISTRY}
+    image: ${REGISTRY}/front-end-booking:latest
