@@ -1,5 +1,5 @@
 # Booking Room Project
-aaa
+
 - `backend/`  – Spring Boot REST API (Java 21, Maven)
 - `frontend/` – Angular app
 - `database/` – MySQL schema & seed scripts
