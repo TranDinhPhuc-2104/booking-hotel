@@ -17,7 +17,6 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -111,8 +110,8 @@ public class HotelService {
             throw new UncheckedIOException(e);
         }
         // shortcut: the old photo file stays on disk, add cleanup if storage grows.
-        hotel.setImageUrl(ServletUriComponentsBuilder.fromCurrentContextPath()
-                .path("/uploads/hotels/" + name).toUriString());
+        // Relative so it resolves against the ALB host, which routes /uploads/* to the backend.
+        hotel.setImageUrl("/uploads/hotels/" + name);
         return HotelResponse.from(hotel);
     }
 }

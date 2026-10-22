@@ -7,13 +7,12 @@ RUN mvn -q package -DskipTests
 
 FROM public.ecr.aws/docker/library/eclipse-temurin:21-jre-alpine
 WORKDIR /app
-# Alpine has no useradd: use BusyBox addgroup/adduser (-S = system account).
+
 RUN addgroup -S app && adduser -S app -G app && mkdir uploads && chown app:app uploads
 COPY --from=build /src/target/*.jar app.jar
 USER app
 VOLUME /app/uploads
 EXPOSE 8080
-# Alpine has no bash: BusyBox wget fails on a 503, which Actuator returns when status is DOWN (e.g. DB unreachable).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:8080/actuator/health | grep -q '"status":"UP"' || exit 1
+  CMD wget -qO- http://127.0.0.1:8080/api/actuator/health | grep -q '"status":"UP"' || exit 1
 ENTRYPOINT ["java", "-jar", "app.jar"]
