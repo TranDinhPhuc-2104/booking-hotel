@@ -17,6 +17,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -34,9 +36,16 @@ public class HotelService {
     private final HotelRepository hotelRepository;
     private final RoomTypeRepository roomTypeRepository;
     private final CurrentUser currentUser;
+    private final S3Client s3;
 
     @Value("${app.upload-dir}")
     private String uploadDir;
+
+    @Value("${app.s3.bucket}")
+    private String bucket;
+
+    @Value("${app.s3.public-url}")
+    private String publicUrl;
 
     // The extension comes from this map, never from the client's filename, so files are always served as images.
     private static final Map<String, String> IMAGE_TYPES =
@@ -94,7 +103,7 @@ public class HotelService {
         return HotelResponse.from(hotel);
     }
 
-    /** Stores the photo under uploads/hotels and points the hotel's imageUrl at it. */
+    /** Stores the photo under hotels/ in S3 (or local uploads/ when no bucket is set) and points imageUrl at it. */
     @Transactional
     public HotelResponse uploadImage(Long hotelId, MultipartFile file) {
         Hotel hotel = requireOwned(hotelId);
@@ -103,13 +112,23 @@ public class HotelService {
             throw new BadRequestException("Upload a JPEG, PNG or WebP image");
         }
         String name = hotelId + "-" + UUID.randomUUID() + "." + ext;
+        // shortcut: the old photo stays in storage, add cleanup if storage grows.
+        if (!bucket.isBlank()) {
+            try {
+                s3.putObject(b -> b.bucket(bucket).key("hotels/" + name).contentType(file.getContentType()),
+                        RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            hotel.setImageUrl(publicUrl + "/hotels/" + name);
+            return HotelResponse.from(hotel);
+        }
         try {
             Path dir = Files.createDirectories(Path.of(uploadDir, "hotels"));
             file.transferTo(dir.resolve(name).toAbsolutePath());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        // shortcut: the old photo file stays on disk, add cleanup if storage grows.
         // Relative so it resolves against the ALB host, which routes /uploads/* to the backend.
         hotel.setImageUrl("/uploads/hotels/" + name);
         return HotelResponse.from(hotel);
